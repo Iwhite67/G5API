@@ -8,7 +8,10 @@
     "clientHome": "http://localhost:8080",
     "useRedis": true,
     "apiURL": "http://localhost:8080/api/",
-    "uploadDemos": false
+    "uploadDemos": false,
+    "localLoginEnabled": true,
+    "redisUrl": "redis://:super_secure@localhost:6379",
+    "redisTTL": 86400
   },
   "development": {
     "driver": "mysql",
@@ -19,11 +22,7 @@
     "flags": { "ENV": "MYSQL_FLAGS" },
     "host": "127.0.0.1",
     "port": 3306,
-    "connectionLimit": 15,
-    "redisHost": "localhost",
-    "redisPort": 6379,
-    "redisTTL": 86400,
-    "redisPass": "super_secure"
+    "connectionLimit": 15
   },
   "admins": {
     "steam_ids": "admins,go,here"
