@@ -67,8 +67,10 @@
   },
   "dependencies": {
     "@node-steam/id": "^1.2.0",
+    "@types/multer": "^2.1.0",
     "aes-js": "^3.1.2",
     "bcrypt": "^6.0.0",
+    "canvas": "^3.2.1",
     "compare-versions": "^6.1.0",
     "config": "^3.3.11",
     "connect-redis": "^7.1.1",
@@ -86,6 +88,7 @@
     "http-errors": "~2.0.0",
     "jszip": "^3.10.1",
     "morgan": "^1.10.1",
+    "multer": "^2.1.1",
     "mysql2": "^3.14.0",
     "node-fetch": "^3.3.2",
     "passport": "^0.6.0",
