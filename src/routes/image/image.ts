@@ -58,7 +58,9 @@ router.post(
   upload.single("background") as any,
   (req: Request, res: Response) => {
     if (!req.file) { res.status(400).json({ error: "No file received." }); return; }
-    const dest = path.join(process.cwd(), "public", "img", req.file.originalname);
+    const imgDir = path.join(process.cwd(), "public", "img");
+    if (!fs.existsSync(imgDir)) fs.mkdirSync(imgDir, { recursive: true });
+    const dest = path.join(imgDir, req.file.originalname);
     writeFileSafe(dest, req.file.buffer);
     const s = loadSettings();
     s.match.background = req.file.originalname;
@@ -73,7 +75,9 @@ router.post(
   upload.single("file") as any,
   (req: Request, res: Response) => {
     if (!req.file) { res.status(400).json({ error: "No file received." }); return; }
-    const dest = path.join(process.cwd(), "public", "img", req.file.originalname);
+    const imgDir = path.join(process.cwd(), "public", "img");
+    if (!fs.existsSync(imgDir)) fs.mkdirSync(imgDir, { recursive: true });
+    const dest = path.join(imgDir, req.file.originalname);
     writeFileSafe(dest, req.file.buffer);
     res.json({ filename: req.file.originalname });
   }
