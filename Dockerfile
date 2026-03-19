@@ -1,6 +1,7 @@
 FROM node:18-alpine
 
-RUN apk add gettext python3 build-base
+RUN apk add --no-cache gettext python3 build-base \
+    pkgconfig cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev pixman-dev
 EXPOSE 3301
 # clone and move into Get5API folder
 WORKDIR /Get5API
