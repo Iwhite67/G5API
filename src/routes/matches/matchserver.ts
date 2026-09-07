@@ -17,6 +17,7 @@ import GlobalEmitter from "../../utility/emitter.js";
 import config from "config";
 
 import { existsSync, readdir } from "fs";
+import path from "path";
 import { AccessMessage } from "../../types/mapstats/AccessMessage.js";
 import { RowDataPacket } from "mysql2";
 import { MapStats } from "../../types/mapstats/MapStats.js";
@@ -551,9 +552,12 @@ router.get(
         return;
       } else {
         let serverUpdate: GameServer = await getGameServer(req.params.match_id);
-        let rconResponse: boolean = await serverUpdate.pauseMatch();
-        if (rconResponse) {
-          res.json({ message: "Match paused." });
+        let rconResponse: string = await serverUpdate.pauseMatch();
+        // MatchZy replies with the actual outcome (paused, already paused,
+        // blocked during halftime, etc). Surface it instead of always
+        // reporting success regardless of what the server actually did.
+        if (rconResponse && rconResponse.trim().length > 0) {
+          res.json({ message: rconResponse.trim() });
         } else {
           res.json({
             message: "Match not paused. Check server log for details.",
@@ -613,9 +617,12 @@ router.get(
         return;
       } else {
         let serverUpdate: GameServer = await getGameServer(req.params.match_id);
-        let rconResponse: boolean = await serverUpdate.unpauseMatch();
-        if (rconResponse) {
-          res.json({ message: "Match unpaused." });
+        let rconResponse: string = await serverUpdate.unpauseMatch();
+        // MatchZy replies with the actual outcome (unpaused, blocked because
+        // an admin paused it, etc). Surface it instead of always reporting
+        // success regardless of what the server actually did.
+        if (rconResponse && rconResponse.trim().length > 0) {
+          res.json({ message: rconResponse.trim() });
         } else {
           res.json({
             message: "Match not unpaused. Check server log for details.",
@@ -1028,8 +1035,15 @@ router.get(
       } else {
         let serverUpdate: GameServer = await getGameServer(req.params.match_id);
         try {
-          let rconResponse: string = await serverUpdate.getBackups();
-          res.json({ message: "Backups retrieved.", response: rconResponse });
+          let rconResponse: string = await serverUpdate.getBackups(req.params.match_id);
+          // MatchZy prints one line per backup, prefixed by the backup filename
+          // (matchzy_<matchId>_<mapNum>_round<N>.json). Filter out any other
+          // console noise the RCON round-trip may have captured.
+          const backupLines: string = rconResponse
+            .split("\n")
+            .filter((line) => /matchzy_\d+_\d+_round\d+\.json/i.test(line))
+            .join("\n");
+          res.json({ message: "Backups retrieved.", response: backupLines });
         } catch (err) {
           res
             .status(500)
@@ -1112,10 +1126,14 @@ router.post(
           return;
         }
         try {
+          // MatchZy's get5_listbackups reply is a full info line, e.g.
+          // "matchzy_123_0_round05.json 2024-01-01 12:00:00 Team1 Team2 de_dust2 5 3".
+          // get5_loadbackup only accepts the filename, so extract just that token.
+          const backupFile: string = req.body[0].backup_name.trim().split(/\s+/)[0];
           let rconResponse: string = await serverUpdate.restoreBackup(
-            req.body[0].backup_name
+            backupFile
           );
-          res.json({ message: "Restored backup.", response: rconResponse });
+          res.json({ message: `Restored backup: ${backupFile}`, response: rconResponse });
         } catch (err) {
           res
             .status(500)
@@ -1214,7 +1232,8 @@ router.post(
         }
 
         // Check to see if file exists in our public directory.
-        if (!existsSync(`public/backups/${req.params.match_id}/${configString}`)) {
+        const safeConfigName = path.basename(configString);
+        if (!existsSync(`public/backups/${req.params.match_id}/${safeConfigName}`)) {
           res
             .status(412)
             .json({ message: "Backup name invalid." });
@@ -1228,12 +1247,21 @@ router.post(
         try {
           if (await serverUpdate.isGet5Available()) {
             let rconResponse: string = await serverUpdate.restoreBackupFromURL(
-              config.get("server.apiURL") + `/backups/${req.params.match_id}/${configString}`
+              config.get("server.apiURL") + `/backups/${req.params.match_id}/${safeConfigName}`
             );
-            currentMatchInfo = "UPDATE `match` SET server_id = ? WHERE id = ?";
-            await db.query(currentMatchInfo, [req.params.match_id, newServerId]);
-            currentMatchInfo = "UPDATE game_server SET in_use = 0 WHERE id = ?";
-            await db.query(currentMatchInfo, [matchServerId[0].server_id]);
+            // Point the match at the new server, and swap in_use flags between
+            // the old and new servers (previously the query params here were
+            // reversed, so server_id was never actually updated).
+            await db.query("UPDATE `match` SET server_id = ? WHERE id = ?", [
+              newServerId,
+              req.params.match_id
+            ]);
+            await db.query("UPDATE game_server SET in_use = 0 WHERE id = ?", [
+              matchServerId[0].server_id
+            ]);
+            await db.query("UPDATE game_server SET in_use = 1 WHERE id = ?", [
+              newServerId
+            ]);
             res.json({ message: "Restored backup.", response: rconResponse });
           } else {
             res
