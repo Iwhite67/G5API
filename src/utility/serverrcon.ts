@@ -443,36 +443,34 @@ class ServerRcon {
   /**
    * Function that will call a pause to the current match. This acts as an admin pause, and will have no time limit.
    * @function
-   * @returns True if we succeed, false otherwise.
+   * @returns The server's reply to the command, empty if none was received.
    */
-  async pauseMatch(): Promise<boolean> {
+  async pauseMatch(): Promise<string> {
     try {
       if (process.env.NODE_ENV === "test") {
-        return false;
+        return "";
       }
-      await this.execute("sm_pause");
-      return true;
+      return await this.execute("sm_pause");
     } catch (err) {
       console.error("RCON error on pause: " + (err as Error).toString());
-      return false;
+      throw err;
     }
   }
 
   /**
    * Function that will call an unpause to the current match. This acts as an admin pause, and will have no time limit.
    * @function
-   * @returns True if we succeed, false otherwise.
+   * @returns The server's reply to the command, empty if none was received.
    */
-  async unpauseMatch(): Promise<boolean> {
+  async unpauseMatch(): Promise<string> {
     try {
       if (process.env.NODE_ENV === "test") {
-        return false;
+        return "";
       }
-      await this.execute("sm_unpause");
-      return true;
+      return await this.execute("sm_unpause");
     } catch (err) {
       console.error("RCON error on unpause server: " + (err as Error).toString());
-      return false;
+      throw err;
     }
   }
 
@@ -551,12 +549,15 @@ class ServerRcon {
    * @function
    * @returns Returns the response from the server.
    */
-  async getBackups(): Promise<string> {
+  async getBackups(matchId?: string): Promise<string> {
     try {
       if (process.env.NODE_ENV === "test") {
         return "Cannot get backups on a test instance. Please use a development or production environment.";
       }
-      let loadMatchResponse = await this.execute("get5_listbackups");
+      // Without a matchId, MatchZy defaults to whichever match is currently
+      // loaded on the server, which may not be the match being queried.
+      const cmd = matchId ? `get5_listbackups ${matchId}` : "get5_listbackups";
+      let loadMatchResponse = await this.execute(cmd);
       return loadMatchResponse;
     } catch (err) {
       console.error("RCON error on getBackups: " + (err as Error).toString());
