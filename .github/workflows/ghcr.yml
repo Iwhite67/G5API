@@ -32,20 +32,20 @@ jobs:
       fail-fast: false
     steps:
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2.1.0
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:latest
           platforms: all
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2.2.1
+        uses: docker/setup-buildx-action@v3
         with:
           buildkitd-flags: --debug
       - id: string
         uses: ASzc/change-string-case-action@v5
         with:
           string: ${{ github.repository_owner }}
-      - uses: actions/checkout@v3.3.0
-      - uses: docker/login-action@v2.1.0
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -58,24 +58,28 @@ jobs:
       # Every push to master publishes :next -- the rolling build, which is
       # master plus whatever dependency and security updates have landed.
       - name: Push :next (master)
-        uses: docker/build-push-action@v3.2.0
+        uses: docker/build-push-action@v6
         if: github.ref == 'refs/heads/master'
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
           push: true
+          provenance: false
+          sbom: false
           tags: |
             ghcr.io/${{ steps.string.outputs.lowercase }}/g5api:next
       # A release tag publishes the version and moves :latest onto it.
       - name: Push :latest and :<version> (tag)
-        uses: docker/build-push-action@v3.2.0
+        uses: docker/build-push-action@v6
         if: startsWith(github.ref, 'refs/tags/')
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
           push: true
+          provenance: false
+          sbom: false
           tags: |
             ghcr.io/${{ steps.string.outputs.lowercase }}/g5api:latest,ghcr.io/${{ steps.string.outputs.lowercase }}/g5api:${{ steps.version.outputs.number }}
       # Pull this version's section out of CHANGELOG.md to use as release notes.
