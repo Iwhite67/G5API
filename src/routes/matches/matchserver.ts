@@ -512,7 +512,7 @@ router.put(
  *
  *  /matches/:match_id/pause:
  *   get:
- *     description: Sends the sm_pause command to a given match.
+ *     description: Sends the css_forcepause command to a given match.
  *     produces:
  *       - application/json
  *     parameters:
@@ -577,7 +577,7 @@ router.get(
  *
  *  /matches/:match_id/unpause:
  *   get:
- *     description: Sends the sm_unpause command to a given match.
+ *     description: Sends the css_forceunpause command to a given match.
  *     produces:
  *       - application/json
  *     parameters:
