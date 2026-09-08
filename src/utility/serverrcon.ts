@@ -450,7 +450,7 @@ class ServerRcon {
       if (process.env.NODE_ENV === "test") {
         return "";
       }
-      return await this.execute("sm_pause");
+      return await this.execute("css_forcepause");
     } catch (err) {
       console.error("RCON error on pause: " + (err as Error).toString());
       throw err;
@@ -467,7 +467,7 @@ class ServerRcon {
       if (process.env.NODE_ENV === "test") {
         return "";
       }
-      return await this.execute("sm_unpause");
+      return await this.execute("css_forceunpause");
     } catch (err) {
       console.error("RCON error on unpause server: " + (err as Error).toString());
       throw err;
