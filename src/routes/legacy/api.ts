@@ -743,15 +743,6 @@ router.post(
           updateSql =
             "UPDATE map_stats SET ? WHERE match_id = ? AND map_number = ?";
           await db.query(updateSql, [updateStmt, matchID, mapNumber]);
-          if (matchValues[0].max_maps == 1 && matchValues[0].season_id != null) {
-            // Live update the score.
-            await update_challonge_match(matchID,
-              matchValues[0].season_id,
-              matchValues[0].team1_id,
-              matchValues[0].team2_id,
-              matchValues[0].max_maps
-            );
-          }
           GlobalEmitter.emit("mapStatUpdate");
           res.status(200).send({ message: "Success" });
         } else {
@@ -1313,15 +1304,6 @@ router.post(
           matchValues[0].team2_id,
           teamIdWinner,
           false
-        );
-      }
-      if (matchValues[0].max_maps != 1 && matchValues[0].season_id != null) {
-        // Live update the score.
-        await update_challonge_match(matchID,
-          matchValues[0].season_id,
-          matchValues[0].team1_id,
-          matchValues[0].team2_id,
-          matchValues[0].max_maps
         );
       }
       GlobalEmitter.emit("mapStatUpdate");

@@ -5,6 +5,20 @@ All notable changes to G5API are documented here.
 Image tags follow the release flow: `next` tracks every push to `master`, and a
 version tag (e.g. `V2.3.0.0`) publishes `latest` alongside the version number.
 
+## [Unreleased]
+
+### Changed
+
+- **Challonge is now reported once per series instead of once per round/map.**
+  `update_challonge_match` used to fire on every `OnRoundEnd` for BO1s and on
+  every map's live-score update and per-map finish for BO3+ (legacy
+  `/map/:map_number/update` and `/map/:map_number/finish`), burning through the
+  API quota over the course of a single series. Those mid-series calls are
+  removed; the bracket is now only ever updated from `OnSeriesResult` (and its
+  legacy `/match/:match_id/finish` equivalent), once the series itself has
+  ended. Importing teams from a Challonge tournament when creating a season is
+  unaffected.
+
 ## [2.3.0.0] - 2026-09-03
 
 ### Added
