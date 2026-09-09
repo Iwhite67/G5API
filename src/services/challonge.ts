@@ -479,6 +479,16 @@ export class Challonge {
     const response: Response = await fetch(url, { ...init, headers });
     if (!response.ok) {
       const body: string = await response.text().catch(() => "");
+      if (response.status === 429 || /quota|rate.?limit/i.test(body)) {
+        const retryAfter: string | null = response.headers.get("retry-after");
+        console.error(
+          `[Challonge] QUOTA REACHED: request to ${path} was rejected with HTTP ${
+            response.status
+          }${retryAfter ? ` (retry after ${retryAfter}s)` : ""}. ` +
+            "Challonge calls will keep failing until the quota resets -- " +
+            "reduce request volume or wait before retrying."
+        );
+      }
       throw new ChallongeApiError(response.status, path, body.substring(0, 500));
     }
     if (response.status === 204) return undefined as T;
