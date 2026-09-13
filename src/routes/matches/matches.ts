@@ -18,6 +18,8 @@ import { generate } from "randomstring";
 
 import Utils from "../../utility/utils.js";
 
+import { validateMapsAgainstSeason } from "../../utility/mapPool.js";
+
 import GameServer from "../../utility/serverrcon.js";
 
 import config from "config";
@@ -1213,6 +1215,24 @@ router.post("/", Utils.ensureAuthenticated, async (req, res, next) => {
     } catch (err) {
       res.status(400).json({ message: (err as Error).message });
       return;
+    }
+
+    // A match belonging to a season may only use maps from that season's own map
+    // pool - the creating user's personal map list is never a valid source here.
+    if (req.body[0].season_id != null) {
+      const submittedMaps: string[] = (req.body[0].veto_mappool ?? "")
+        .toString()
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const seasonMapError = await validateMapsAgainstSeason(
+        req.body[0].season_id,
+        submittedMaps
+      );
+      if (seasonMapError != null) {
+        res.status(400).json({ message: seasonMapError });
+        return;
+      }
     }
 
     // DatHost on-the-fly provisioning: require server_id null and DatHost config.
