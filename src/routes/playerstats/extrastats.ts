@@ -182,14 +182,13 @@ import { Response } from "express-serve-static-core";
  router.get("/:steam_id", async (req, res, next) => {
   try {
     let steamID: string = req.params.steam_id;
-    let sql: string = "SELECT id FROM player_stats WHERE steam_id = ?"
-    let extraSql: string = "SELECT * FROM player_stat_extras where id IN (?)";
-    const playerIds: RowDataPacket[] = await db.query(sql, [steamID]);
-    if (!playerIds.length) {
-      res.status(404).json({ message: "No stats found for player " + steamID });
-      return;
-    }
-    const extrastats: RowDataPacket[] = await db.query(extraSql, [playerIds]);
+    // NOTE: previously joined on `player_stats.id IN (...)` against
+    // `player_stat_extras.id`, two unrelated primary keys - that matched
+    // arbitrary rows rather than this player's own kills/deaths/assists.
+    // Match directly on the steam ids player_stat_extras actually records.
+    let extraSql: string =
+      "SELECT * FROM player_stat_extras WHERE attacker_steam_id = ? OR player_steam_id = ? OR assister_steam_id = ?";
+    const extrastats: RowDataPacket[] = await db.query(extraSql, [steamID, steamID, steamID]);
     if (!extrastats.length) {
       res.status(404).json({ message: "No extra stats found for player " + steamID });
       return;
