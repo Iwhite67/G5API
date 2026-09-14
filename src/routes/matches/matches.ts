@@ -1429,7 +1429,7 @@ router.post("/", Utils.ensureAuthenticated, async (req, res, next) => {
       const submittedMaps: string[] = (req.body[0].veto_mappool ?? "")
         .toString()
         .trim()
-        .split(/\s+/)
+        .split(/[\s,]+/)
         .filter(Boolean);
       const seasonMapError = await validateMapsAgainstSeason(
         req.body[0].season_id,
@@ -1629,6 +1629,7 @@ router.post("/", Utils.ensureAuthenticated, async (req, res, next) => {
         }
       }
     }
+    GlobalEmitter.emit("matchUpdate");
     res.json({
       message: "Match inserted successfully!",
       id: insertMatch.insertId
@@ -1702,8 +1703,33 @@ router.put("/", Utils.ensureAuthenticated, async (req, res, next) => {
       return;
     } else {
       let currentMatchInfo: string =
-        "SELECT id, user_id, server_id, cancelled, forfeit, end_time, api_key, veto_mappool, max_maps, skip_veto, is_pug FROM `match` WHERE id = ?";
+        "SELECT id, user_id, server_id, cancelled, forfeit, end_time, api_key, veto_mappool, max_maps, skip_veto, is_pug, season_id FROM `match` WHERE id = ?";
       const matchRow: RowDataPacket[] = await db.query(currentMatchInfo, req.body[0].match_id);
+
+      // Same season/map-pool guard as match creation - only relevant when
+      // either the season or the map pool is actually being changed.
+      if (req.body[0].season_id !== undefined || req.body[0].veto_mappool !== undefined) {
+        const effectiveSeasonId =
+          req.body[0].season_id !== undefined ? req.body[0].season_id : matchRow[0].season_id;
+        if (effectiveSeasonId != null) {
+          const effectiveMapPool =
+            req.body[0].veto_mappool !== undefined ? req.body[0].veto_mappool : matchRow[0].veto_mappool;
+          const submittedMaps: string[] = (effectiveMapPool ?? "")
+            .toString()
+            .trim()
+            .split(/[\s,]+/)
+            .filter(Boolean);
+          const seasonMapError = await validateMapsAgainstSeason(
+            effectiveSeasonId,
+            submittedMaps
+          );
+          if (seasonMapError != null) {
+            res.status(400).json({ message: seasonMapError });
+            return;
+          }
+        }
+      }
+
       if (req.body[0].server_id != null) {
         // Check if server is owned, public, or in use by another match.
         let serverCheckSql: string =

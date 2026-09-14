@@ -368,7 +368,7 @@ router.get("/:match_id/mvp", async (req, res) => {
          SUM(ps.kast) AS kast, SUM(ps.contribution_score) AS contribution_score, SUM(ps.mvp) AS mvp
        FROM player_stats ps
        WHERE ps.match_id = ?
-       GROUP BY ps.steam_id, ps.team_id`,
+       GROUP BY ps.steam_id, ps.name, ps.team_id`,
       [matchId]
     );
 
@@ -783,7 +783,7 @@ router.get("/:match_id/:map_number/mvp", async (req, res) => {
          SUM(ps.kast) AS kast, SUM(ps.contribution_score) AS contribution_score, SUM(ps.mvp) AS mvp
        FROM player_stats ps
        WHERE ps.match_id = ? AND ps.map_id = ?
-       GROUP BY ps.steam_id, ps.team_id`,
+       GROUP BY ps.steam_id, ps.name, ps.team_id`,
       [matchId, mapStat.id]
     );
 

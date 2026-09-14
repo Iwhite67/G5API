@@ -596,6 +596,41 @@ router.get("/match/:match_id", async (req, res, next) => {
   }
 });
 
+const LIVE_STAT_FIELDS =
+  "kills, deaths, assists, roundsplayed, headshot_kills, " +
+  "damage, util_damage, flashbang_assists, enemies_flashed, " +
+  "bomb_plants, bomb_defuses, " +
+  "v1, v2, v3, v4, v5, k1, k2, k3, k4, k5, " +
+  "kast, mvp, contribution_score";
+
+/**
+ * Builds the SELECT fields/filter/GROUP BY needed to report live match stats.
+ * When a map is currently in progress, per-map rows are returned as-is.
+ * When no map is in progress (between maps, or before the first one goes
+ * live), the whole match's rows are aggregated instead of arbitrarily
+ * picking a single map's row.
+ */
+function buildLiveStatFields(currentMap: RowDataPacket | null) {
+  if (currentMap) {
+    return {
+      fields: LIVE_STAT_FIELDS,
+      mapFilter: "AND map_id = ?",
+      mapParam: [currentMap.id],
+      groupBy: ""
+    };
+  }
+  const aggFields = LIVE_STAT_FIELDS.split(",")
+    .map((f) => f.trim())
+    .map((f) => `SUM(${f}) AS ${f}`)
+    .join(", ");
+  return {
+    fields: aggFields,
+    mapFilter: "",
+    mapParam: [] as number[],
+    groupBy: "GROUP BY steam_id, name, team_id"
+  };
+}
+
 /**
  * @swagger
  *
@@ -654,29 +689,19 @@ router.get("/:steam_id/live", async (req, res, next) => {
     const currentMapRows: RowDataPacket[] = await db.query(currentMapSql, [matchId]);
     const currentMap = currentMapRows[0] || null;
 
-    const statFields =
-      "kills, deaths, assists, roundsplayed, headshot_kills, " +
-      "damage, util_damage, flashbang_assists, enemies_flashed, " +
-      "bomb_plants, bomb_defuses, " +
-      "v1, v2, v3, v4, v5, k1, k2, k3, k4, k5, " +
-      "kast, mvp, contribution_score";
-
-    // Player/team stats for the current map only (fall back to the whole
-    // match's stats when no map is currently in progress).
-    const mapFilter = currentMap ? "AND map_id = ?" : "";
-    const mapParam = currentMap ? [currentMap.id] : [];
+    const { fields, mapFilter, mapParam, groupBy } = buildLiveStatFields(currentMap);
 
     const playerStatSql: string =
-      `SELECT steam_id, name, team_id, ${statFields} ` +
-      `FROM player_stats WHERE match_id = ? AND steam_id = ? ${mapFilter}`;
+      `SELECT steam_id, name, team_id, ${fields} ` +
+      `FROM player_stats WHERE match_id = ? AND steam_id = ? ${mapFilter} ${groupBy}`;
     const playerStats: RowDataPacket[] = await db.query(
       playerStatSql,
       [matchId, steamId, ...mapParam]
     );
 
     const teamStatSql: string =
-      `SELECT steam_id, name, team_id, ${statFields} ` +
-      `FROM player_stats WHERE match_id = ? AND team_id = ? ${mapFilter}`;
+      `SELECT steam_id, name, team_id, ${fields} ` +
+      `FROM player_stats WHERE match_id = ? AND team_id = ? ${mapFilter} ${groupBy}`;
     const teamStats: RowDataPacket[] = await db.query(
       teamStatSql,
       [matchId, playerTeamId, ...mapParam]
@@ -721,6 +746,7 @@ router.get("/:steam_id/live/stream", async (req, res, next) => {
       "FROM `match` m " +
       "JOIN player_stats ps ON ps.match_id = m.id " +
       "WHERE ps.steam_id = ? " +
+      "AND m.end_time IS NULL " +
       "AND (m.cancelled = 0 OR m.cancelled IS NULL) " +
       "ORDER BY m.id DESC LIMIT 1";
 
@@ -728,12 +754,6 @@ router.get("/:steam_id/live/stream", async (req, res, next) => {
       "SELECT id, map_number, map_name, team1_score, team2_score " +
       "FROM map_stats WHERE match_id = ? AND end_time IS NULL " +
       "ORDER BY map_number DESC LIMIT 1";
-
-    const statFields =
-      "kills, deaths, assists, roundsplayed, headshot_kills, " +
-      "damage, util_damage, flashbang_assists, enemies_flashed, " +
-      "bomb_plants, bomb_defuses, v1, v2, v3, v4, v5, k1, k2, k3, k4, k5, " +
-      "kast, mvp, contribution_score";
 
     const buildPayload = async (): Promise<object> => {
       const liveMatches: RowDataPacket[] = await db.query(liveMatchSql, [steamId]);
@@ -746,15 +766,14 @@ router.get("/:steam_id/live/stream", async (req, res, next) => {
       const currentMapRows: RowDataPacket[] = await db.query(currentMapSql, [matchId]);
       const currentMap = currentMapRows[0] || null;
 
-      const mapFilter = currentMap ? "AND map_id = ?" : "";
-      const mapParam = currentMap ? [currentMap.id] : [];
+      const { fields, mapFilter, mapParam, groupBy } = buildLiveStatFields(currentMap);
 
       const playerStats: RowDataPacket[] = await db.query(
-        `SELECT steam_id, name, team_id, ${statFields} FROM player_stats WHERE match_id = ? AND steam_id = ? ${mapFilter}`,
+        `SELECT steam_id, name, team_id, ${fields} FROM player_stats WHERE match_id = ? AND steam_id = ? ${mapFilter} ${groupBy}`,
         [matchId, steamId, ...mapParam]
       );
       const teamStats: RowDataPacket[] = await db.query(
-        `SELECT steam_id, name, team_id, ${statFields} FROM player_stats WHERE match_id = ? AND team_id = ? ${mapFilter}`,
+        `SELECT steam_id, name, team_id, ${fields} FROM player_stats WHERE match_id = ? AND team_id = ? ${mapFilter} ${groupBy}`,
         [matchId, playerTeamId, ...mapParam]
       );
 
@@ -782,15 +801,18 @@ router.get("/:steam_id/live/stream", async (req, res, next) => {
 
     GlobalEmitter.on("playerStatsUpdate", onUpdate);
     GlobalEmitter.on("matchUpdate", onUpdate);
+    GlobalEmitter.on("mapStatUpdate", onUpdate);
 
     req.on("close", () => {
       GlobalEmitter.removeListener("playerStatsUpdate", onUpdate);
       GlobalEmitter.removeListener("matchUpdate", onUpdate);
+      GlobalEmitter.removeListener("mapStatUpdate", onUpdate);
       res.end();
     });
     req.on("disconnect", () => {
       GlobalEmitter.removeListener("playerStatsUpdate", onUpdate);
       GlobalEmitter.removeListener("matchUpdate", onUpdate);
+      GlobalEmitter.removeListener("mapStatUpdate", onUpdate);
       res.end();
     });
   } catch (err) {

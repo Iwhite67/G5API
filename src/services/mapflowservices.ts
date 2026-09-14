@@ -28,8 +28,8 @@ import { Get5_OnRoundStart } from "../types/map_flow/Get5_OnRoundStart.js";
 // Regulation length (MR12, 24 rounds) and rounds per overtime half (MR3) used
 // to snapshot the regulation score and track per-OT score deltas in
 // OnRoundEnd below.
-const REG_ROUNDS = 24;
-const OT_LEN = 6;
+export const REG_ROUNDS = 24;
+export const OT_LEN = 6;
 
 /**
  * @class
@@ -276,6 +276,19 @@ class MapFlowService {
         event.matchid,
         mapStatInfo[0]?.id
       ]);
+
+      // team1_first_side is never sent to us directly - persist it the first
+      // time we see this map's first round end, so later rounds/OTs (and the
+      // fallback side computation below) have a real value instead of always
+      // defaulting to "CT".
+      let team1FirstSide: string | null = mapStatInfo[0]?.team1_first_side ?? null;
+      if (!team1FirstSide && event.round_number === 1) {
+        team1FirstSide = (event.team1.side ?? event.team1.starting_side ?? "CT").toUpperCase();
+        await db.query(
+          "UPDATE map_stats SET team1_first_side = ? WHERE id = ?",
+          [team1FirstSide, mapStatInfo[0].id]
+        );
+      }
       for (let player of event.team1.players) {
         singlePlayerStat = playerStats.filter(
           (dbPlayer) => dbPlayer.steam_id == player.steamid
@@ -331,7 +344,9 @@ class MapFlowService {
              ON DUPLICATE KEY UPDATE team1_first_side = VALUES(team1_first_side)`,
             [
               mapStatInfo[0].id, otNum,
-              event.team1.starting_side?.toUpperCase() ?? null,
+              // The side the team is actually on when this OT starts, not
+              // the side it started the whole map with.
+              event.team1.side?.toUpperCase() ?? null,
               mapStatInfo[0].team1_score_ct, mapStatInfo[0].team1_score_t,
               mapStatInfo[0].team2_score_ct, mapStatInfo[0].team2_score_t
             ]
@@ -400,7 +415,7 @@ class MapFlowService {
         // half-swap) if starting_side wasn't sent.
         let team1Side: string | null = event.team1.starting_side ?? null;
         if (!team1Side) {
-          const firstSide = (mapStatInfo[0].team1_first_side ?? "CT").toUpperCase();
+          const firstSide = (team1FirstSide ?? "CT").toUpperCase();
           const rn = event.round_number;
           if (rn <= 12) {
             team1Side = firstSide;

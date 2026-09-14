@@ -19,8 +19,6 @@ function requireCastOrAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-router.use(Utils.ensureAuthenticated, requireCastOrAdmin);
-
 const SLOT_SELECT =
   "SELECT s.id, s.label, s.slug, s.match_id, " +
   "m.team1_string, m.team2_string, m.cancelled, m.end_time, m.max_maps " +
@@ -34,6 +32,41 @@ async function generateUniqueSlug(): Promise<string> {
   }
   throw new Error("Unable to generate a unique OBS slot slug.");
 }
+
+/**
+ * @swagger
+ *
+ * /obs-slots/public/{slug}:
+ *   get:
+ *     description: Resolve an OBS slot's slug to its assigned match, with no authentication - used by OBS browser sources.
+ *     tags:
+ *       - obs-slots
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         schema:
+ *           type: string
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: The slot's current match assignment.
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/Error'
+ */
+router.get("/public/:slug", async (req: Request, res: Response) => {
+  try {
+    const slots: RowDataPacket[] = await db.query(SLOT_SELECT + "WHERE s.slug = ?", [req.params.slug]);
+    if (!slots.length) { res.status(404).json({ message: "Slot not found." }); return; }
+    res.json({ slot: slots[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: (err as Error).toString() });
+  }
+});
+
+router.use(Utils.ensureAuthenticated, requireCastOrAdmin);
 
 /**
  * @swagger
