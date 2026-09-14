@@ -148,6 +148,7 @@ class MapFlowService {
         bomb: event.bomb,
         headshot: event.headshot,
         thru_smoke: event.thru_smoke,
+        penetrated: event.penetrated,
         attacker_blind: event.attacker_blind,
         no_scope: event.no_scope,
         suicide: event.suicide,
