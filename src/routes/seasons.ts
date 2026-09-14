@@ -390,8 +390,8 @@ router.post("/", Utils.ensureAuthenticated, async (req, res, next) => {
         insertSet = {
           //@ts-ignore
           season_id: insertSeason.insertId,
-          cvar_name: key.replace(/"/g, '\\"'),
-          cvar_value: typeof defaultCvar[key] === 'string' ? defaultCvar[key].replace(/"/g, '\\"').replace(/\\/g, '\\\\') : defaultCvar[key]
+          cvar_name: key,
+          cvar_value: defaultCvar[key]
         };
         await db.query(sql, [insertSet]);
       }
@@ -492,8 +492,8 @@ router.put("/", Utils.ensureAuthenticated, async (req, res, next) => {
         for (let key in defaultCvar) {
           let insertSet: SeasonCvarObject = {
             season_id: req.body[0].season_id,
-            cvar_name: key.replace(/"/g, '\\"'),
-            cvar_value: typeof defaultCvar[key] === 'string' ? defaultCvar[key].replace(/"/g, '\\"').replace(/\\/g, '\\\\') : defaultCvar[key],
+            cvar_name: key,
+            cvar_value: defaultCvar[key],
           };
           await db.query(sql, [insertSet]);
         }
