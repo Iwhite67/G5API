@@ -9,7 +9,7 @@ import pkg from 'aes-js';
 const { utils, ModeOfOperation } = pkg;
 
 /** Crypto for assigning random  */
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 
 /** Config to get database key.
  * @const
@@ -167,6 +167,20 @@ static async getRatingFromSteamId(steamId: string): Promise<number | null> {
       throw err;
     }
   }
+  /** One-way SHA-256 hash, hex-encoded. Used where a secret (e.g. a server's RCON
+   * password) must never be sent back out over the API in a readable form - unlike
+   * encrypt()/decrypt(), this can't be reversed to recover the original value.
+   * @name hash
+   * @function
+   * @inner
+   * @memberof module:utils
+   * @param {string} source - The value to hash.
+   */
+  static hash(source: string | null | undefined) {
+    if (source === null || source === undefined) return null;
+    return createHash("sha256").update(source).digest("hex");
+  }
+
   /** Ensures the user was authenticated through steam OAuth.
    * @function
    * @memberof module:utils
@@ -227,6 +241,18 @@ static async getRatingFromSteamId(steamId: string): Promise<number | null> {
    */
   static superAdminCheck(user: User) {
     if (user) return user.super_admin === 0 ? false : true;
+    else return false;
+  }
+
+  /** Checks if a user has the cast (broadcaster) role in the system during their session.
+   * @function
+   * @memberof module:utils
+   * @inner
+   * @name castCheck
+   * @param {user} user - the users session object.
+   */
+  static castCheck(user: User) {
+    if (user) return user.cast === 1 || user.cast === true ? true : false;
     else return false;
   }
 
